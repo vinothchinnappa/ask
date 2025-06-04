@@ -1,25 +1,23 @@
-from fastapi import FastAPI, Form
-import base64
-import tempfile
+from fastapi import FastAPI, UploadFile, File, Form
 from utils import extract_text_from_file, ask_cohere
+import tempfile
 
 app = FastAPI()
 documents = {}
 
 @app.post("/upload")
-async def upload_doc(
-    file_name: str = Form(...),
-    file_base64: str = Form(...)
-):
-    # Decode base64 content to bytes
-    file_bytes = base64.b64decode(file_base64)
-
-    # Save to temp file
+async def upload_doc(file: UploadFile = File(...)):
     with tempfile.NamedTemporaryFile(delete=False) as tmp:
-        tmp.write(file_bytes)
+        tmp.write(await file.read())
         tmp_path = tmp.name
+    doc_id = file.filename
+    text = extract_text_from_file(tmp_path, file.filename)
+    documents[doc_id] = text
+    return {"message": "Uploaded", "doc_id": doc_id}
 
-    # Extract text from file
-    text = extract_text_from_file(tmp_path, file_name)
-    documents[file_name] = text
-    return {"message": "Uploaded", "doc_id": file_name}
+@app.post("/ask")
+async def ask_question(doc_id: str = Form(...), question: str = Form(...)):
+    if doc_id not in documents:
+        return {"error": "Document not found"}
+    answer = ask_cohere(documents[doc_id], question)
+    return {"answer": answer}
