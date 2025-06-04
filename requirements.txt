@@ -5,3 +5,4 @@ cohere
 pymupdf
 pandas
 openpyxl
+python-multipart
